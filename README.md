@@ -1,8 +1,6 @@
 # Rural Electrification Planner
 
-**Design and Economic Analysis of a Rural Electrification System — a six-step approach from load
-estimation to a fully sized PV system (with battery or diesel-generator backup) and full economic
-parameters.**
+**Design and Economic Analysis of a Rural Electrification System,  a six-step approach from load estimation to a fully sized off-grid electric system (for now only Solar PV with battery or diesel-generator backup) and all major economic parameters.**
 
 > ⚠️ **Academic project.** This tool and its outputs are for educational demonstration only. Figures
 > are illustrative and are **not** validated or accurate for real-time or investment-grade engineering
@@ -27,16 +25,16 @@ parameters.**
 
 ## Description & Scope
 
-This project plans and economically evaluates a **solar mini-grid** for an off-grid rural community —
+This project plans and economically evaluates a **solar mini-grid** for an off-grid rural community,
 starting from a household-by-household appliance inventory and ending at a fully sized PV plant (with
-either a **battery bank** or a **diesel generator** as backup/firming), a bill of quantities, an LCOE
+either a **battery bank** or a **diesel generator** as backup/firming), an LCOE
 calculation, and an ROI/NPV/payback cash-flow model.
 
 It began as a from-scratch re-implementation, in Python, of a large Excel-based engineering workbook
 (`Base-Calculations-00.xlsx`, 12 sheets, ~1.9 MB of formulas) built for a real reference site
 ("Shamspir", a coastal site with 1,480 households across 3 socio-economic categories). Every core
 calculation was first built and validated cell-by-cell against that workbook in a series of Jupyter
-notebooks (see [Notebook Details](#notebook-details)), then ported into a small Streamlit app, and
+notebooks (see [Notebook Details](#notebook-details)), then ported into a small Streamlit based dashboard, and
 finally rebuilt as the app in this repository: a **FastAPI** backend (wrapping the exact same
 calculation modules as a JSON REST API) and a **React + Tailwind CSS + Apache ECharts** frontend.
 
