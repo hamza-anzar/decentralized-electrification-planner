@@ -1,0 +1,20 @@
+item_no,description,qty,unit,unit_cost_eur,system_unit,lumpsum_unit_cost_eur,total_cost_eur
+1,Solar Panels (590 W rated),,,,W,0.248484848484848,0.0
+2,Inverter (500 kW rated),4,Nos.,0.0,,,0.0
+3,DC Cables,37400,m,0.0,,,0.0
+4,AC Cables,350,m,0.0,,,0.0
+5,Grounding Cable (PV),994,m,0.0,,,0.0
+6,Grounding Cable (Structure),605,m,0.0,,,0.0
+7,Grounding Cable (Inverter),64,m,0.0,,,0.0
+8,DC Breakers,198,Nos.,0.0,,,0.0
+9,LV Switchgear,6,Nos.,0.0,,,0.0
+10,Cable Trays & Conduits,6,Lot,0.0,,,0.0
+11,Panel Mounting Structure,1,Lot,0.0,,,0.0
+12,Civil Work,1,Lot,0.0,,,0.0
+13,Water Cleaning System,1,Lot,0.0,,,0.0
+14,Transport Cost,1,Lot,0.0,,,0.0
+15,Commissioning + 3-month O&M,1,Lot,0.0,,,0.0
+16,Diesel Generator(s),,,,kW,500.0,0.0
+17,Generator Installation & Commissioning,,,,kW,75.0,0.0
+18,Fuel Storage Tank,1,Lot,0.0,,,0.0
+19,Cables & Distribution Infrastructure,1,Lot,121212.121212121,,,121212.121212121

@@ -1,0 +1,4 @@
+parameter,value,unit,description
+performance_ratio_Q,0.85,fraction,PV system performance ratio / derating factor (used in the Egen formula)
+reference_irradiance_iqc_kwm2,1.0,kW/m2,Reference/STC irradiance used to normalize Egen
+ppeak_w,500000.0,W,"Selected PV array nameplate capacity for the Solar+Diesel scenario (no battery here — sized to track average daytime demand, not annual demand; see the Recommended Size callout)"

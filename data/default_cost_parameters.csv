@@ -1,0 +1,12 @@
+parameter,value,unit,description
+land_cost_approach,buy,buy | private_lease | govt_lease | none,Which land-cost figure (if any) is included in the totals
+insurance_pct_per_year,0.005,fraction/year,"Insurance cost, as a fraction of capital cost per year"
+om_eur_per_kw_per_year,1.52,EUR/kW/year,Operations & maintenance cost per kW of Ppeak per year (converted from 1.8 USD/kW/yr)
+eur_to_pkr_rate,330,PKR/EUR,Exchange rate — multiply a EUR figure by this to display it in PKR
+eur_to_usd_rate,1.18,USD/EUR,Exchange rate — multiply a EUR figure by this to display it in USD
+inflation_rate,0.08,fraction/year,Annual inflation applied to the O&M cash flow
+discount_rate,0.1,fraction/year,Annual discount rate used to present-value the O&M cash flow
+inverter_replacement_pct,0.15,fraction,"Inverter replacement cost, as a fraction of (capital cost minus battery cost)"
+project_lifetime_years,30,years,Project lifetime used for the O&M cash-flow horizon and the LCOE energy denominator
+use_lump_sum_capex,0,0 or 1 (boolean),"If 1, override the itemized BOQ total with lump_sum_capex_eur below"
+lump_sum_capex_eur,1830303.03030303,EUR,Used only when use_lump_sum_capex=1 — a single all-in capital cost figure

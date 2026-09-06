@@ -1,0 +1,8 @@
+# solar-api.txt — configuration for a CUSTOM solar irradiance API (optional).
+# PVGIS and NASA POWER (the app's two built-in sources) need nothing here — this file is only
+# for adding a THIRD, different provider, e.g. one that requires a paid account and an API key.
+#
+# To use one: sign up with the provider, get an API key, then uncomment and fill in the two lines below.
+# provider_name = Solcast
+# base_url = https://api.solcast.com.au/data/historic/radiation_and_weather
+# api_key = your_api_key_here

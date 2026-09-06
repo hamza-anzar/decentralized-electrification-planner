@@ -1,0 +1,12 @@
+field,value,unit,description
+project_name,Shamspir Rural Electrification,,Name of the project / site
+country,Pakistan,,Country
+region_city_village,"Shams Pir Island, Karachi",,City / village / region name
+latitude,24.843,degrees N,Site latitude (also used by the Solar Design page)
+longitude,66.919,degrees E,Site longitude (also used by the Solar Design page)
+population,7500,people,Total population at the site (independent of household count — used for per-capita figures)
+area_km2,0.65,km2,Approximate site/service area
+weather_type,Coastal / arid,,"General climate classification (e.g. coastal, arid, temperate)"
+socioeconomic_class,Mixed (low to high income),,Broad socio-economic description of the served population
+gdp_per_capita_usd,1500,USD/person/year,"Reference GDP per capita, for later socio-economic analysis"
+electrification_pct,0,%,Current grid electrification rate at the site before this project (0 = fully off-grid)

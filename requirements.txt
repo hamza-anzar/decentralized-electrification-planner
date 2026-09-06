@@ -1,0 +1,46 @@
+# Rural Electrification Planning App — Python dependencies
+# Install with:  pip install -r requirements.txt
+# (Create your own venv first if running locally: python -m venv venv && source venv/bin/activate  [Windows: venv\Scripts\activate])
+#
+# NOTE: minimum versions are used (not exact pins) so pip picks a prebuilt wheel matching
+# whatever Python version you have (3.10-3.13+), instead of trying to compile from source.
+
+# --- Core data handling ---
+pandas>=2.2.3
+numpy>=1.26
+openpyxl>=3.1.5          # read/write .xlsx (Base-Calculations-00.xlsx, user uploads/downloads)
+xlsxwriter>=3.2.0        # nicer formatted Excel export (templates, downloadable BOQ/report files)
+
+# --- Notebook execution environment (Step-by-step development) ---
+jupyter>=1.1.1
+notebook>=7.2.2
+ipykernel>=6.29.5
+nbformat>=5.10.4
+
+# --- Current app backend: FastAPI, serving the React frontend in frontend/ (see frontend/README.md) ---
+# Run with:  cd backend && uvicorn main:app --reload --port 8000
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12  # form/file upload support (Excel template uploads)
+
+# --- Legacy app framework (superseded by backend/ + frontend/, kept only for the old app/ Streamlit reference) ---
+streamlit>=1.39.0
+streamlit-echarts>=0.4.0
+matplotlib>=3.9.2        # fallback/static plots, useful in notebooks
+pillow>=10.0.0            # used once to crop the app's tab-icon illustrations into app/assets/icons/
+
+# --- Solar irradiation data retrieval (Annexure IV equivalent) ---
+requests>=2.32.3         # calls to PVGIS (re.jrc.ec.europa.eu) and/or NASA POWER API for annual irradiance data
+
+# --- Date/time & calendar handling (hourly-of-year profile construction, seasons, holidays) ---
+python-dateutil>=2.9.0
+pytz>=2024.2
+
+# --- Numerical/interpolation helpers (battery SOC simulation, curve fitting where needed) ---
+scipy>=1.14.1
+
+# --- Config / settings ---
+PyYAML>=6.0.2             # for storing default assumption sets (appliance lists, costs, etc.) as editable config files
+
+# --- Currency handling (PKR <-> EUR conversion, formatting) ---
+babel>=2.16.0              # currency/number formatting helpers

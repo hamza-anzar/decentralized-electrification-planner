@@ -1,0 +1,6 @@
+result,value,unit,description
+annual_egen_wh,3511438706.0,Wh,Total annual PV generation at the selected Ppeak
+annual_demand_wh,3440337926.0,Wh,Total annual demand
+worst_deficit_block_wh,-8578449.0,Wh,Worst single contiguous deficit run — drives battery sizing
+battery_capacity_kwh,9000.0,kWh,Sized battery capacity
+zero_yield_hours,537.0,hours/year,Hours per year the battery is fully depleted (unserved demand) at the sized capacity

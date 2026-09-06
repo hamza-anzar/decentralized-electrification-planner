@@ -1,0 +1,13 @@
+period_name,start_mmdd,end_mmdd,weekday_daytype,weekend_daytype
+January,01-01,01-31,January,Winter_Weekend
+February,02-01,02-28,February,Winter_Weekend
+March,03-01,03-31,March,Winter_Weekend
+April,04-01,04-30,April,Summer_Weekend
+May,05-01,05-31,May,Summer_Weekend
+June_1_15,06-01,06-15,June_1_15,Summer_Weekend
+Early_Monsoon,06-16,07-31,Early_Monsoon,Early_Monsoon_Weekend
+Peak_Monsoon_1,08-01,08-15,Peak_Monsoon_1,Peak_Monsoon_Weekend
+Peak_Monsoon_2,08-16,09-15,Peak_Monsoon_2,Peak_Monsoon_Weekend
+Late_Summer,09-16,10-31,Late_Summer,Late_Summer_Weekend
+November,11-01,11-30,November,Winter_Weekend
+December,12-01,12-31,December,Winter_Weekend

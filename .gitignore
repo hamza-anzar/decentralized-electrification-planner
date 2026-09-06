@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Node / frontend build output
+node_modules/
+dist/
+
+# Runtime logs from local dev servers
+*.log
+
+# Old backup/scratch artifacts, not part of the project
+deleted/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode/

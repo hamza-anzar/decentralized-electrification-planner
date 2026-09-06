@@ -1,0 +1,13 @@
+result,value,unit,description
+annual_egen_wh,877859676.5,Wh,Total annual PV generation at the selected Ppeak
+annual_demand_wh,3440337926.0,Wh,Total annual demand
+peak_deficit_w,1168270.5,W,Worst single-hour shortfall PV alone can't cover — drives generator sizing
+recommended_generator_kw,1500.0,kW,"Recommended total generator capacity (peak deficit + safety margin, rounded up)"
+generator_unit_size_kw,1000.0,kW,"Size of a single generator unit, as configured"
+generator_count,1.0,units,"Number of generator units, as configured"
+installed_capacity_kw,1000.0,kW,Total installed generator capacity (unit size x count)
+unmet_hours,116.0,hours/year,Hours per year where PV + generator together still can't cover demand (unserved) — the diesel scenario's equivalent of zero-yield hours
+unserved_energy_wh,13835949.5,Wh,Total annual energy shortfall during unmet hours
+annual_generator_output_wh,2557734787.0,Wh,Total annual generator output
+annual_fuel_liters,767320.4360999999,L,Total annual diesel fuel consumption
+annual_fuel_cost_eur,767320.4360999999,EUR,Total annual diesel fuel cost

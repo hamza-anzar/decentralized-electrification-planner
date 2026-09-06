@@ -1,0 +1,6 @@
+parameter,value,unit,description
+performance_ratio_Q,0.85,fraction,PV system performance ratio / derating factor (used in the Egen formula)
+reference_irradiance_iqc_kwm2,1.0,kW/m2,Reference/STC irradiance used to normalize Egen
+ppeak_w,2000000.0,W,Selected PV array nameplate capacity to size/test
+battery_dod,0.8,fraction,Battery maximum Depth of Discharge
+battery_quality_factor,0.85,fraction,Battery quality/derating factor applied on top of DoD when sizing (replaces the workbook's undocumented x0.90)

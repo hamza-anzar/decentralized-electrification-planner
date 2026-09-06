@@ -1,0 +1,17 @@
+section,metric,value,unit
+Load,Total connected load,1.81128,MW
+Load,Annual demand,3.440337926,GWh/year
+PV / Battery,PV array size (Ppeak),2.0,MW
+PV / Battery,Annual generation (Egen),3.839823405,GWh/year
+PV / Battery,Battery capacity,8000.0,kWh
+PV / Battery,Zero-yield hours,317.0,h/year
+Cost,Capital cost (Capex),1830303.0303030333,EUR
+Cost,Capital cost (Capex),2157142.8571428633,USD
+Cost,"Total Opex (30yr, present value basis)",1575325.4285820753,EUR
+Cost,Total cost (Capex+Opex),3405628.4588851086,EUR
+Cost,LCOE (generation-based),0.0295641066413843,EUR/kWh
+ROI,Tariff used,0.0295641066413843,EUR/kWh
+ROI,NPV,-1549416.208729314,EUR
+ROI,Lifetime ROI,-80.78984318392177,%
+ROI,Simple payback,,years
+ROI,Discounted payback,,years

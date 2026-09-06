@@ -1,0 +1,17 @@
+category,appliance,power_w,qty_per_house,comment
+A,LED Light,18,5,
+A,Ceiling Fan,50,3,
+A,Television,60,1,
+A,Iron,800,1,Assuming daily use for simplicity
+A,Refrigerator,800,1,800 W = surge load; running load ~200 W (assumed)
+A,Washing Machine,350,1,Assuming daily use for simplicity (actual: 2 days/week)
+B,LED Light,18,4,
+B,Ceiling Fan,50,2,
+B,Television,60,1,
+B,Iron,800,1,Assuming daily use for simplicity
+B,Refrigerator,800,1,
+C,LED Light,18,2,
+C,Ceiling Fan,50,1,
+A,Others,0,1,Placeholder for an extra appliance — edit power (W) and qty per house
+B,Others,0,1,Placeholder for an extra appliance — edit power (W) and qty per house
+C,Others,0,1,Placeholder for an extra appliance — edit power (W) and qty per house
