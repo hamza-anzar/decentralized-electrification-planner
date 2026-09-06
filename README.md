@@ -9,7 +9,7 @@ parameters.**
 > or financial decisions.
 
 ![Landing page](docs/screenshots/01_landing.png)
-
+![Landing page](docs/screenshots/ss1.png)
 ---
 
 ## Table of Contents
