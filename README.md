@@ -178,7 +178,7 @@ The app guides you through six steps, shown as a stepper across the top of every
 ### 2. Download the project
 
 ```bash
-git clone https://github.com/<your-username>/rural-electrification-planner.git
+git clone https://github.com/hamza-anzar/rural-electrification-planner.git
 cd rural-electrification-planner
 ```
 
