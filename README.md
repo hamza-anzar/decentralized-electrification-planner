@@ -1,6 +1,6 @@
-# Rural Electrification Planner
+# Decentralized Electrification Planner
 
-**Design and Economic Analysis of a Rural Electrification System,  a six-step approach from load estimation to a fully sized off-grid electric system (for now only Solar PV with battery or diesel-generator backup) and all major economic parameters.**
+**Design and Economic Analysis of a Decentralized Electrification System,  a six-step approach from load estimation to a fully sized off-grid electric system (for now only Solar PV with battery or diesel-generator backup) and all major economic parameters.**
 
 > ⚠️ **Academic project.** This tool and its outputs are for educational demonstration only. Figures
 > are illustrative and are **not** validated or accurate for real-time or investment-grade engineering
@@ -124,7 +124,7 @@ their rationale are logged in [`docs/PROJECT_LOG.md`](docs/PROJECT_LOG.md).
 ## Repository Layout
 
 ```
-Rural Electrification/
+decentralized-electrification-planner/
 ├── notebooks/                          # Development notebooks, one per core stage
 ├── data/                               # Default assumption tables and saved results (editable CSV)
 ├── rural-electrification-webapp/       # The app: current, actively developed deliverable
@@ -203,8 +203,8 @@ The app guides you through six steps, shown as a stepper across the top of every
 ### 2. Download the project
 
 ```bash
-git clone https://github.com/hamza-anzar/rural-electrification-planner.git
-cd rural-electrification-planner
+git clone https://github.com/hamza-anzar/decentralized-electrification-planner.git
+cd decentralized-electrification-planner
 ```
 
 ### 3. Python environment (backend + notebooks)
