@@ -1,6 +1,6 @@
 # Decentralized Electrification Planner
 
-**Design and Economic Analysis of a Decentralized Electrification System,  a six-step approach from load estimation to a fully sized off-grid electric system (for now only Solar PV with battery or diesel-generator backup) and all major economic parameters.**
+**Design and Economic Analysis of a Decentralized Electrification System focused for rural areas,  a six-step approach from load estimation to a fully sized off-grid electric system (for now only Solar PV with battery or diesel-generator backup) and all major economic parameters.**
 
 > ⚠️ **Academic project.** This tool and its outputs are for educational demonstration only. Figures
 > are illustrative and are **not** validated or accurate for real-time or investment-grade engineering
