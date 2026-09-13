@@ -29,20 +29,55 @@ def load_defaults() -> dict:
 def load_demand_settings() -> dict:
     """Project start year / duration / load-growth-rate settings for Demand Setup's own growth-
     projection chart — a Demand-Setup-scoped copy of the growth-rate concept, independent of the ROI
-    cash-flow's own annual_load_growth_pct (which stays scenario-specific on Financials/Results)."""
+    cash-flow's own annual_load_growth_pct (which stays scenario-specific on Financials/Results).
+    Also carries the optional load-randomness overlay (load_randomness_pct, random_seed) — see
+    apply_load_randomness()."""
     path = DATA_DIR / "default_demand_settings.csv"
+    defaults = {"project_start_year": 2026, "project_duration_years": 30, "annual_load_growth_pct": 3.0,
+                "load_randomness_pct": 0.0, "random_seed": 42}
     if not path.exists():
-        return {"project_start_year": 2026, "project_duration_years": 30, "annual_load_growth_pct": 3.0}
+        return defaults
     row = pd.read_csv(path).iloc[0]
     return {
         "project_start_year": int(row["project_start_year"]),
         "project_duration_years": int(row["project_duration_years"]),
         "annual_load_growth_pct": float(row["annual_load_growth_pct"]),
+        "load_randomness_pct": float(row["load_randomness_pct"]) if "load_randomness_pct" in row else defaults["load_randomness_pct"],
+        "random_seed": int(row["random_seed"]) if "random_seed" in row else defaults["random_seed"],
     }
 
 
 def save_demand_settings(settings: dict) -> None:
     pd.DataFrame([settings]).to_csv(DATA_DIR / "default_demand_settings.csv", index=False)
+
+
+def apply_load_randomness(hourly_profile_df: pd.DataFrame, randomness_pct: float, seed: int) -> pd.DataFrame:
+    """Overlay realistic hour-to-hour variability on the deterministic demand profile.
+
+    Method: multiplicative Gaussian noise per hour, Demand_actual(h) = Demand(h) x (1 + eps_h), with
+    eps_h ~ Normal(0, randomness_pct/100), independently drawn for every hour of the year and clipped
+    to +/-3 standard deviations so no single hour swings unrealistically. The same factor is applied to
+    every category column for a given hour, so totals stay internally consistent (total_wh always
+    equals the sum of the category columns) and the noise reads as genuine demand uncertainty rather
+    than one category behaving oddly.
+
+    randomness_pct=0 (the default) returns the profile unchanged — the exact deterministic curve the
+    calendar/day-type rules produce, matching the workbook methodology. A fixed seed makes results
+    reproducible between recomputes; pick a new seed to draw a different random pattern.
+    """
+    if not randomness_pct:
+        return hourly_profile_df
+    rng = np.random.default_rng(int(seed))
+    sigma = randomness_pct / 100
+    noise = rng.normal(loc=0.0, scale=sigma, size=len(hourly_profile_df))
+    noise = np.clip(noise, -3 * sigma, 3 * sigma)
+    factor = np.clip(1 + noise, 0.05, None)  # never let an hour go to zero/negative demand
+
+    out = hourly_profile_df.copy()
+    for col in ("A_wh", "B_wh", "C_wh", "Misc_wh", "total_wh"):
+        if col in out.columns:
+            out[col] = out[col] * factor
+    return out
 
 
 def count_period_daytype_days(season_periods_df: pd.DataFrame, year: int = 2026) -> pd.DataFrame:
@@ -70,6 +105,34 @@ def build_power_lookup(appliances_df: pd.DataFrame, misc_loads_df: pd.DataFrame)
     misc_power = misc_loads_df[["appliance", "power_w"]].rename(columns={"appliance": "item"})
     misc_power.insert(0, "category", "Misc")
     return pd.concat([appliance_power, misc_power], ignore_index=True)
+
+
+def sync_daytype_profiles(daytype_profiles_df: pd.DataFrame, appliances_df: pd.DataFrame,
+                           misc_loads_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep the day-type usage table in step with the current appliance/misc-load list.
+
+    A new appliance added on Load Setup has no rows here yet (this table is keyed by
+    (day_type, hour_of_day, category, item), one row per hour of every day type — ~450 rows per
+    item). Without this, the item silently drops out of the hourly demand calculation entirely
+    (compute_hourly_demand's first merge is against this table, so an item missing here never
+    appears in the merged result at all) and never shows up in the Day-Type Usage Profiles grid.
+    This adds an "off" (qty_active=0) row for every day type x hour for any item that's missing,
+    so it appears in the grid ready to edit, and drops rows for items that were removed."""
+    lookup = build_power_lookup(appliances_df, misc_loads_df)[["category", "item"]].drop_duplicates()
+    wanted = pd.MultiIndex.from_frame(lookup)
+    day_types = daytype_profiles_df["day_type"].unique()
+
+    existing = pd.MultiIndex.from_frame(daytype_profiles_df[["category", "item"]])
+    synced = daytype_profiles_df[existing.isin(wanted)].copy()
+
+    missing = lookup[~wanted.isin(existing)]
+    if len(missing) and len(day_types):
+        new_rows = pd.DataFrame([
+            {"day_type": dt, "hour_of_day": h, "category": row.category, "item": row.item, "qty_active": 0.0}
+            for row in missing.itertuples() for dt in day_types for h in range(24)
+        ])
+        synced = pd.concat([synced, new_rows], ignore_index=True)
+    return synced
 
 
 def validate_season_periods(season_periods_df: pd.DataFrame, year: int = 2026) -> list:

@@ -1,6 +1,6 @@
 result,value,unit
-capital_cost_eur,2162000.0,EUR
-total_opex_eur,1780251.6562399096,EUR
-total_cost_eur,3942251.6562399096,EUR
-total_energy_kwh_30yr,105343161.17999999,kWh
-lcoe_eur_per_kwh,0.03742294812573337,EUR/kWh
+capital_cost_eur,5243040.0,EUR
+total_opex_eur,4610394.462462474,EUR
+total_cost_eur,9853434.462462474,EUR
+total_energy_kwh_30yr,275472366.4857,kWh
+lcoe_eur_per_kwh,0.035769230097981435,EUR/kWh

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, PartyPopper, Flag, Grid3x3, Zap, UploadCloud, TrendingUp } from "lucide-react";
+import { CalendarDays, PartyPopper, Flag, Grid3x3, Zap, UploadCloud, TrendingUp, Shuffle } from "lucide-react";
 import { Card, SectionHeader, PageHeader } from "../components/Card";
 import { Field, Select, NumberInput } from "../components/Field";
 import EditableTable from "../components/Table";
@@ -282,7 +282,16 @@ export default function DemandProfile() {
           </div>
 
           <Card>
-            <SectionHeader icon={Grid3x3} title="Day-Type Usage Profiles" subtitle="How active each appliance is, hour by hour, for the selected day type (0 = off, 1 = fully on)" color={step.color} />
+            <SectionHeader icon={Grid3x3} title="Day-Type Usage Profiles" subtitle="How active each appliance is, hour by hour, for the selected day type" color={step.color} />
+            <p className="mb-4 rounded-xl bg-ink-50 px-4 py-3 text-xs text-ink-500">
+              Each value is <strong>how many of that item's units are running</strong> in that hour, not a 0–1
+              fraction. E.g. a category with 5 LED Lights (Qty/House on Load Setup) uses <strong>0</strong> when none
+              are on, up to <strong>5</strong> when all are on, so 3 lights on is entered as <strong>3</strong>, not
+              0.6. Community/misc. loads and a few appliances (like the fridge's duty cycle) instead use a
+              <strong> fractional utilization</strong> of their rated power, e.g. <strong>0.5</strong> = running at
+              half capacity, <strong>1</strong> = full rated output. A newly added appliance starts at 0 (off) in
+              every hour until you set its pattern here.
+            </p>
             <div className="mb-4 max-w-xs">
               <Field label="Day type">
                 <Select value={selectedDayType} onChange={(e) => setSelectedDayType(e.target.value)}>
@@ -295,6 +304,41 @@ export default function DemandProfile() {
               </Field>
             </div>
             <DayTypeGrid rows={daytypeProfiles} dayType={selectedDayType} onChange={setDaytypeProfiles} />
+          </Card>
+
+          <Card>
+            <SectionHeader
+              icon={Shuffle}
+              title="Load Realism (Randomness)"
+              subtitle="Demand(h) x (1 + eps), eps ~ Normal(0, randomness%) — an optional hour-by-hour random overlay so the curve looks less like a repeating pattern and more like real metered demand"
+              color={step.color}
+            />
+            <div className="mb-2 flex flex-wrap items-end gap-4">
+              <Field label="Load Randomness (%)" className="w-48">
+                <NumberInput
+                  step="0.5"
+                  min="0"
+                  value={demandSettings.load_randomness_pct}
+                  onChange={(e) => setDemandSettings({ ...demandSettings, load_randomness_pct: e.target.value === "" ? "" : Number(e.target.value) })}
+                />
+              </Field>
+              <Button
+                variant="secondary"
+                icon={Shuffle}
+                onClick={() => setDemandSettings({ ...demandSettings, random_seed: Math.floor(Math.random() * 1_000_000) })}
+              >
+                Regenerate Random Pattern
+              </Button>
+              <p className="text-xs text-ink-400 max-w-md">
+                0% keeps the exact deterministic profile the calendar/day-type rules produce (matches the workbook
+                methodology). Above 0%, every hour gets its own independent random swing, clipped to +/-3 standard
+                deviations so no single hour goes unrealistic — the same swing is applied across all categories for
+                that hour, so totals stay consistent. Individual households vary a lot hour to hour (20-40% is normal),
+                but aggregated across many households true randomness mostly cancels out, so a modest 5-10% is more
+                realistic than a large one at this scale. Seed: {demandSettings.random_seed} (fixed, so recomputing
+                gives the same pattern — regenerate for a different draw).
+              </p>
+            </div>
           </Card>
 
           <Card padded={false} className="overflow-hidden">

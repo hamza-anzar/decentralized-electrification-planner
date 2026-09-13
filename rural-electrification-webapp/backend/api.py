@@ -128,14 +128,18 @@ class DemandProfilePayload(BaseModel):
     appliances: list[dict[str, Any]]
     miscLoads: list[dict[str, Any]]
     householdCategories: list[dict[str, Any]]
-    demandSettings: dict[str, Any] = {"project_start_year": 2026, "project_duration_years": 30, "annual_load_growth_pct": 3.0}
+    demandSettings: dict[str, Any] = {"project_start_year": 2026, "project_duration_years": 30, "annual_load_growth_pct": 3.0,
+                                       "load_randomness_pct": 0.0, "random_seed": 42}
 
 
 @router.get("/demand-profile/defaults")
 def demand_profile_defaults():
     d = lp.load_defaults()
+    appliances = pd.read_csv(DATA_DIR / "default_appliances.csv")
+    misc_loads = pd.read_csv(DATA_DIR / "default_misc_loads.csv")
+    daytype_profiles = lp.sync_daytype_profiles(d["daytype_profiles"], appliances, misc_loads)
     return {
-        "daytypeProfiles": clean_records(d["daytype_profiles"]),
+        "daytypeProfiles": clean_records(daytype_profiles),
         "seasonPeriods": clean_records(d["season_periods"]),
         "publicHolidays": clean_records(d["public_holidays"]),
         "festivalHolidays": clean_records(d["festival_holidays"]),
@@ -163,11 +167,14 @@ def _compute_demand_profile(payload: DemandProfilePayload):
         raise HTTPException(400, {"errors": errors})
     ph = pd.DataFrame(payload.publicHolidays)
     fh = pd.DataFrame(payload.festivalHolidays)
-    dtp = pd.DataFrame(payload.daytypeProfiles)
     appl = pd.DataFrame(payload.appliances)
     misc = pd.DataFrame(payload.miscLoads)
     hh = pd.DataFrame(payload.householdCategories)
+    dtp = lp.sync_daytype_profiles(pd.DataFrame(payload.daytypeProfiles), appl, misc)
     full = lp.compute_full_profile(year, sp, ph, fh, dtp, appl, misc, hh)
+    randomness_pct = float(payload.demandSettings.get("load_randomness_pct") or 0.0)
+    seed = int(payload.demandSettings.get("random_seed") or 42)
+    full["hourly_profile"] = lp.apply_load_randomness(full["hourly_profile"], randomness_pct, seed)
     return sp, ph, fh, dtp, full
 
 

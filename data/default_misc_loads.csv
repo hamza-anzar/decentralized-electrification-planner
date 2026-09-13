@@ -1,6 +1,6 @@
 appliance,power_w,qty,comment
-Hospital,2000,1,~40 kWh/day small hospital -> ~2 kW constant load assumed; 1 hospital in area
-Street Light,60,50,"50 lights assumed for a 0.65 sq.km area (perimeter, internal roads, population)"
-Cold Storage,10500,5,28A/380V max current; constant load assumed (multiple compressors stagger surge)
-School,5860,1,"10 classrooms + staff/principal/admin rooms + 4 toilets + canteen: ~20 lights, 14 fans, 20 computers (200 W), 1 fridge"
-Others,4000,1,"Pumps, offices, shops, etc. — assumed 2x the hospital load"
+Hospital,2000,2.0,~40 kWh/day small hospital -> ~2 kW constant load assumed; 1 hospital in area
+Street Light,60,80.0,"50 lights assumed for a 0.65 sq.km area (perimeter, internal roads, population)"
+Cold Storage,10500,7.0,28A/380V max current; constant load assumed (multiple compressors stagger surge)
+School,5860,3.0,"10 classrooms + staff/principal/admin rooms + 4 toilets + canteen: ~20 lights, 14 fans, 20 computers (200 W), 1 fridge"
+Others,4000,1.5,"Pumps, offices, shops, etc. — assumed 2x the hospital load"

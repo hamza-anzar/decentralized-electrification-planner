@@ -1,0 +1,6 @@
+venv\Scripts\activate
+cd rural-electrification-webapp\backend
+uvicorn main:app --reload --port 8000
+
+cd rural-electrification-webapp\frontend
+npm run dev
