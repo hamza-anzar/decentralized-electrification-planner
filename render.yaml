@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: decentralized-electrification-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd rural-electrification-webapp/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ALLOWED_ORIGIN
+        value: https://decentralized-electrification-frontend.onrender.com
+
+  - type: web
+    name: decentralized-electrification-frontend
+    runtime: static
+    plan: free
+    buildCommand: cd rural-electrification-webapp/frontend && npm install && npm run build
+    staticPublishPath: rural-electrification-webapp/frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://decentralized-electrification-backend.onrender.com
+    routes:
+      - type: rewrite
+        source: "/**"
+        destination: /index.html
