@@ -15,7 +15,6 @@ services:
   - type: web
     name: decentralized-electrification-frontend
     runtime: static
-    plan: free
     buildCommand: cd rural-electrification-webapp/frontend && npm install && npm run build
     staticPublishPath: rural-electrification-webapp/frontend/dist
     envVars:
