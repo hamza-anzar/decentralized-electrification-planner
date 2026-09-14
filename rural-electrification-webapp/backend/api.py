@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from core import load_estimation as le
 from core import load_profile as lp
 from core import solar_pv as spv
+from core import wind_pv as wpv
 from core import cost_lcoe as cl
 from core import summary_roi as sr
 from core import site_info as si
@@ -415,6 +416,152 @@ def solar_diesel_save(payload: DieselPvComputePayload):
 
 
 # ---------------------------------------------------------------------------
+# 4c. System Design — Wind Turbine + Battery (wind speed & turbine-curve selection are shared with 4d.)
+# ---------------------------------------------------------------------------
+
+class WindComputePayload(BaseModel):
+    windParameters: list[dict[str, Any]]
+    powerCurve: Optional[list[dict[str, Any]]] = None  # explicit curve (from the library selection or a custom upload); falls back to windParameters' turbine_model
+    windSpeed: Optional[list[dict[str, Any]]] = None
+    manualBatteryKwh: Optional[float] = None
+
+
+def _resolve_power_curve(power_curve_payload: Optional[list[dict[str, Any]]], wind_parameters_df: pd.DataFrame) -> pd.DataFrame:
+    if power_curve_payload:
+        return pd.DataFrame(power_curve_payload)
+    model = wpv.get_param(wind_parameters_df, "turbine_model")
+    return wpv.power_curve_for_model(model)
+
+
+@router.get("/wind-design/defaults")
+def wind_design_defaults():
+    return {
+        "windSpeed": clean_records(wpv.load_default_wind_speed()),
+        "windParameters": clean_records(wpv.load_default_wind_parameters()),
+        "turbineLibrary": clean_records(wpv.load_wind_turbine_library()),
+        "lat": wpv.DEFAULT_LAT, "lon": wpv.DEFAULT_LON,
+    }
+
+
+@router.post("/wind-design/fetch-resource")
+def wind_design_fetch_resource(payload: FetchResourcePayload):
+    result = wpv.get_wind_resource(payload.lat, payload.lon, source=payload.source)
+    return {
+        "windSpeed": clean_records(result["data"]) if result["data"] is not None else None,
+        "sourceUsed": result["source_used"], "errors": result["errors"],
+    }
+
+
+@router.get("/wind-design/curve-template")
+def wind_design_curve_template():
+    """Blank wind_speed_ms/power_kw workbook — used by both Wind+Battery and Wind+Diesel's custom-curve upload."""
+    return _xlsx_response(lambda buf: wpv.export_custom_curve_template(buf), "Custom_Wind_Turbine_Curve_Template.xlsx")
+
+
+@router.post("/wind-design/curve-upload")
+def wind_design_curve_upload(file: UploadFile = File(...)):
+    result = wpv.import_custom_curve_template(io.BytesIO(file.file.read()))
+    if result["errors"]:
+        return {"powerCurve": None, "errors": result["errors"]}
+    return {"powerCurve": clean_records(result["data"]), "errors": []}
+
+
+@router.post("/wind-design/recommended-turbine-count")
+def wind_design_recommended_turbine_count(payload: WindComputePayload):
+    """Smallest turbine count whose annual generation meets or exceeds annual demand (see
+    wind_pv.recommend_turbine_count) — always manually overridable, same as every other sizing
+    recommendation in this app."""
+    hourly = _load_hourly_for_solar()
+    wind_speed = pd.DataFrame(payload.windSpeed) if payload.windSpeed else wpv.load_default_wind_speed()
+    wind_params = pd.DataFrame(payload.windParameters)
+    curve = _resolve_power_curve(payload.powerCurve, wind_params)
+    demand, wind_speed_hub = wpv._wind_speed_at_hub(hourly, wind_speed, wind_params)
+    single_turbine_egen = wpv.compute_wind_egen(wind_speed_hub, curve, turbine_count=1)
+    return native(wpv.recommend_turbine_count(demand, single_turbine_egen))
+
+
+def _run_wind_battery(payload: WindComputePayload):
+    hourly = _load_hourly_for_solar()
+    wind_speed = pd.DataFrame(payload.windSpeed) if payload.windSpeed else wpv.load_default_wind_speed()
+    wind_params = pd.DataFrame(payload.windParameters)
+    curve = _resolve_power_curve(payload.powerCurve, wind_params)
+    step = wpv.run_wind_battery_sizing(hourly, wind_speed, wind_params, curve, manual_battery_kwh=payload.manualBatteryKwh)
+    candidate_sizes = list(range(1000, 16001, 1000))
+    sensitivity = spv.battery_size_sensitivity(step["blocks"]["delta_e_wh"], candidate_sizes)
+    return wind_speed, wind_params, curve, step, sensitivity
+
+
+_WIND_SIM_COLUMNS = ["hour_of_year", "demand_wh", "wind_speed_ms", "egen_wh", "delta_e_wh", "battery_soc_wh"]
+
+
+@router.post("/wind-design/compute")
+def wind_design_compute(payload: WindComputePayload):
+    _, _, _, step, sensitivity = _run_wind_battery(payload)
+    return native({"simulation": step["simulation"][_WIND_SIM_COLUMNS], "results": step["results"], "sensitivity": sensitivity})
+
+
+@router.post("/wind-design/save")
+def wind_design_save(payload: WindComputePayload):
+    wind_speed, wind_params, curve, step, sensitivity = _run_wind_battery(payload)
+    wpv.save_wind_battery_results(step["simulation"], step["results"])
+    wind_params.to_csv(DATA_DIR / "default_wind_parameters.csv", index=False)
+    wind_speed.to_csv(DATA_DIR / "default_wind_speed_2026.csv", index=False)
+    return native({"simulation": step["simulation"][_WIND_SIM_COLUMNS], "results": step["results"], "sensitivity": sensitivity})
+
+
+# ---------------------------------------------------------------------------
+# 4d. System Design — Wind Turbine + Diesel Generator
+# ---------------------------------------------------------------------------
+
+class WindDieselComputePayload(BaseModel):
+    windParameters: list[dict[str, Any]]
+    generatorParameters: list[dict[str, Any]]
+    powerCurve: Optional[list[dict[str, Any]]] = None
+    windSpeed: Optional[list[dict[str, Any]]] = None
+
+
+@router.get("/wind-diesel-design/defaults")
+def wind_diesel_design_defaults():
+    return {
+        "windParameters": clean_records(wpv.load_default_wind_parameters_diesel()),
+        "generatorParameters": clean_records(wpv.load_default_diesel_generator_parameters_wind()),
+        "turbineLibrary": clean_records(wpv.load_wind_turbine_library()),
+    }
+
+
+def _run_wind_diesel(payload: WindDieselComputePayload):
+    hourly = _load_hourly_for_solar()
+    wind_speed = pd.DataFrame(payload.windSpeed) if payload.windSpeed else wpv.load_default_wind_speed()
+    wind_params = pd.DataFrame(payload.windParameters)
+    genp = pd.DataFrame(payload.generatorParameters)
+    curve = _resolve_power_curve(payload.powerCurve, wind_params)
+    step = wpv.run_wind_diesel_sizing(hourly, wind_speed, wind_params, curve, genp)
+    return wind_speed, wind_params, genp, curve, step
+
+
+@router.post("/wind-diesel-design/compute")
+def wind_diesel_design_compute(payload: WindDieselComputePayload):
+    _, _, _, _, step = _run_wind_diesel(payload)
+    return native({
+        "simulation": step["simulation"], "results": step["results"],
+        "loadDurationCurve": spv.deficit_load_duration(step["deficit"]),
+    })
+
+
+@router.post("/wind-diesel-design/save")
+def wind_diesel_design_save(payload: WindDieselComputePayload):
+    wind_speed, wind_params, genp, curve, step = _run_wind_diesel(payload)
+    wpv.save_wind_diesel_sizing_results(step["simulation"], step["results"])
+    wind_params.to_csv(DATA_DIR / "default_wind_parameters_diesel.csv", index=False)
+    genp.to_csv(DATA_DIR / "default_diesel_generator_parameters_wind.csv", index=False)
+    wind_speed.to_csv(DATA_DIR / "default_wind_speed_2026.csv", index=False)  # shared wind-speed dataset
+    return native({
+        "simulation": step["simulation"], "results": step["results"],
+        "loadDurationCurve": spv.deficit_load_duration(step["deficit"]),
+    })
+
+
+# ---------------------------------------------------------------------------
 # 5. Financials
 # ---------------------------------------------------------------------------
 
@@ -575,6 +722,150 @@ def financials_diesel_save(payload: DieselFinancialsPayload):
 
 
 # ---------------------------------------------------------------------------
+# 5c. Financials — Wind Turbine + Battery (land cost options are the shared file from 5. above)
+# ---------------------------------------------------------------------------
+
+@router.get("/financials-wind-battery/defaults")
+def financials_wind_battery_defaults():
+    d = cl.load_wind_battery_defaults()
+    return {
+        "boqItems": clean_records(d["boq_items"]),
+        "landCostOptions": clean_records(d["land_cost_options"]),
+        "costParameters": clean_records(d["cost_parameters"]),
+    }
+
+
+@router.get("/financials-wind-battery/template")
+def financials_wind_battery_template():
+    d = cl.load_wind_battery_defaults()
+    return _xlsx_response(
+        lambda buf: cl.export_wind_battery_cost_template(d["boq_items"], d["land_cost_options"], d["cost_parameters"], buf),
+        "Wind_Battery_Cost_BOQ_Template.xlsx",
+    )
+
+
+@router.post("/financials-wind-battery/upload")
+def financials_wind_battery_upload(file: UploadFile = File(...)):
+    result = cl.import_wind_battery_cost_template(io.BytesIO(file.file.read()))
+    if result["errors"]:
+        return {"boqItems": None, "landCostOptions": None, "costParameters": None, "errors": result["errors"]}
+    return {
+        "boqItems": clean_records(result["boq_items"]),
+        "landCostOptions": clean_records(result["land_cost_options"]),
+        "costParameters": clean_records(result["cost_parameters"]),
+        "errors": [],
+    }
+
+
+def _load_wind_battery_sizing_context():
+    results_path = DATA_DIR / "wind_battery_sizing_results_2026.csv"
+    if not results_path.exists():
+        raise HTTPException(400, {"errors": ["No saved Wind+Battery sizing yet — visit System Design's Wind+Battery tab and save results first."]})
+    return pd.read_csv(results_path).set_index("result")["value"]
+
+
+def _run_wind_battery_financials(payload: FinancialsPayload):
+    boq = pd.DataFrame(payload.boqItems)
+    land = pd.DataFrame(payload.landCostOptions)
+    cost_params = pd.DataFrame(payload.costParameters)
+    cost_params["value"] = cl.coerce_numeric_column(cost_params["value"])
+    wind_results = _load_wind_battery_sizing_context()
+    result = cl.run_wind_cost_lcoe_pipeline(boq, land, cost_params, wind_results["installed_capacity_kw"],
+                                             wind_results["battery_capacity_kwh"], wind_results["annual_egen_wh"])
+    return boq, land, cost_params, result
+
+
+@router.post("/financials-wind-battery/compute")
+def financials_wind_battery_compute(payload: FinancialsPayload):
+    _, _, cost_params, result = _run_wind_battery_financials(payload)
+    eur_to_pkr = cl.get_param(cost_params, "eur_to_pkr_rate")
+    eur_to_usd = cl.get_param(cost_params, "eur_to_usd_rate")
+    return native({**result, "eurToPkr": eur_to_pkr, "eurToUsd": eur_to_usd})
+
+
+@router.post("/financials-wind-battery/save")
+def financials_wind_battery_save(payload: FinancialsPayload):
+    boq, land, cost_params, result = _run_wind_battery_financials(payload)
+    cl.save_wind_battery_results(result)
+    boq.to_csv(DATA_DIR / "default_boq_items_wind_battery.csv", index=False)
+    land.to_csv(DATA_DIR / "default_land_cost_options.csv", index=False)
+    cost_params.to_csv(DATA_DIR / "default_cost_parameters_wind_battery.csv", index=False)
+    eur_to_pkr = cl.get_param(cost_params, "eur_to_pkr_rate")
+    eur_to_usd = cl.get_param(cost_params, "eur_to_usd_rate")
+    return native({**result, "eurToPkr": eur_to_pkr, "eurToUsd": eur_to_usd})
+
+
+# ---------------------------------------------------------------------------
+# 5d. Financials — Wind Turbine + Diesel Generator (land cost options are the shared file from 5. above)
+# ---------------------------------------------------------------------------
+
+@router.get("/financials-wind-diesel/defaults")
+def financials_wind_diesel_defaults():
+    d = cl.load_wind_diesel_defaults()
+    return {"boqItems": clean_records(d["boq_items"]), "costParameters": clean_records(d["cost_parameters"])}
+
+
+@router.get("/financials-wind-diesel/template")
+def financials_wind_diesel_template():
+    d = cl.load_wind_diesel_defaults()
+    return _xlsx_response(
+        lambda buf: cl.export_wind_diesel_cost_template(d["boq_items"], d["cost_parameters"], buf),
+        "Wind_Diesel_Cost_BOQ_Template.xlsx",
+    )
+
+
+@router.post("/financials-wind-diesel/upload")
+def financials_wind_diesel_upload(file: UploadFile = File(...)):
+    result = cl.import_wind_diesel_cost_template(io.BytesIO(file.file.read()))
+    if result["errors"]:
+        return {"boqItems": None, "costParameters": None, "errors": result["errors"]}
+    return {"boqItems": clean_records(result["boq_items"]), "costParameters": clean_records(result["cost_parameters"]), "errors": []}
+
+
+def _load_wind_diesel_sizing_context():
+    results_path = DATA_DIR / "wind_diesel_sizing_results_2026.csv"
+    if not results_path.exists():
+        raise HTTPException(400, {"errors": ["No saved Wind+Diesel sizing yet — visit System Design's Wind+Diesel tab and save results first."]})
+    return pd.read_csv(results_path).set_index("result")["value"]
+
+
+def _run_wind_diesel_financials(payload: DieselFinancialsPayload):
+    boq = pd.DataFrame(payload.boqItems)
+    cost_params = pd.DataFrame(payload.costParameters)
+    cost_params["value"] = cl.coerce_numeric_column(cost_params["value"])
+    wind_diesel_results = _load_wind_diesel_sizing_context()
+    land = pd.read_csv(DATA_DIR / "default_land_cost_options.csv")  # shared with the Battery scenarios
+
+    wind_installed_capacity_kw = float(wind_diesel_results["wind_installed_capacity_kw"])
+    generator_installed_capacity_kw = float(wind_diesel_results["installed_capacity_kw"])
+    annual_fuel_cost_eur = float(wind_diesel_results["annual_fuel_cost_eur"])
+    annual_energy_served_wh = float(wind_diesel_results["annual_demand_wh"]) - float(wind_diesel_results["unserved_energy_wh"])
+
+    result = cl.run_wind_diesel_cost_lcoe_pipeline(boq, land, cost_params, wind_installed_capacity_kw,
+                                                    generator_installed_capacity_kw, annual_fuel_cost_eur, annual_energy_served_wh)
+    return boq, cost_params, result
+
+
+@router.post("/financials-wind-diesel/compute")
+def financials_wind_diesel_compute(payload: DieselFinancialsPayload):
+    _, cost_params, result = _run_wind_diesel_financials(payload)
+    eur_to_pkr = cl.get_param(cost_params, "eur_to_pkr_rate")
+    eur_to_usd = cl.get_param(cost_params, "eur_to_usd_rate")
+    return native({**result, "eurToPkr": eur_to_pkr, "eurToUsd": eur_to_usd})
+
+
+@router.post("/financials-wind-diesel/save")
+def financials_wind_diesel_save(payload: DieselFinancialsPayload):
+    boq, cost_params, result = _run_wind_diesel_financials(payload)
+    cl.save_wind_diesel_results(result)
+    boq.to_csv(DATA_DIR / "default_boq_items_wind_diesel.csv", index=False)
+    cost_params.to_csv(DATA_DIR / "default_cost_parameters_wind_diesel.csv", index=False)
+    eur_to_pkr = cl.get_param(cost_params, "eur_to_pkr_rate")
+    eur_to_usd = cl.get_param(cost_params, "eur_to_usd_rate")
+    return native({**result, "eurToPkr": eur_to_pkr, "eurToUsd": eur_to_usd})
+
+
+# ---------------------------------------------------------------------------
 # 6. Results
 # ---------------------------------------------------------------------------
 
@@ -588,6 +879,20 @@ def _results_filenames(system_type: str) -> dict:
             "cost_lcoe_results": "cost_lcoe_results_diesel_2026.csv", "cost_parameters": "default_cost_parameters_diesel.csv",
             "roi_parameters": "default_roi_parameters_diesel.csv", "roi_results": "roi_results_diesel_2026.csv",
             "master_summary": "master_summary_diesel_2026.csv", "boq_items": "default_boq_items_diesel.csv",
+        }
+    if system_type == "wind_battery":
+        return {
+            "pv_parameters": "default_wind_parameters.csv", "pv_results": "wind_battery_sizing_results_2026.csv",
+            "cost_lcoe_results": "cost_lcoe_results_wind_battery_2026.csv", "cost_parameters": "default_cost_parameters_wind_battery.csv",
+            "roi_parameters": "default_roi_parameters_wind_battery.csv", "roi_results": "roi_results_wind_battery_2026.csv",
+            "master_summary": "master_summary_wind_battery_2026.csv", "boq_items": "default_boq_items_wind_battery.csv",
+        }
+    if system_type == "wind_diesel":
+        return {
+            "pv_parameters": "default_wind_parameters_diesel.csv", "pv_results": "wind_diesel_sizing_results_2026.csv",
+            "cost_lcoe_results": "cost_lcoe_results_wind_diesel_2026.csv", "cost_parameters": "default_cost_parameters_wind_diesel.csv",
+            "roi_parameters": "default_roi_parameters_wind_diesel.csv", "roi_results": "roi_results_wind_diesel_2026.csv",
+            "master_summary": "master_summary_wind_diesel_2026.csv", "boq_items": "default_boq_items_wind_diesel.csv",
         }
     return {
         "pv_parameters": "default_pv_parameters.csv", "pv_results": "pv_battery_sizing_results_2026.csv",
@@ -609,6 +914,7 @@ def _load_results_context(system_type: str = "battery"):
     annual_demand_wh = float(hourly_profile["total_wh"].sum())
     pv_results = pd.read_csv(DATA_DIR / files["pv_results"]).set_index("result")["value"]
     pv_parameters = pd.read_csv(DATA_DIR / files["pv_parameters"]).set_index("parameter")["value"]
+    pv_parameters = cl.coerce_numeric_column(pv_parameters)  # wind parameter files mix a string (turbine_model) with numbers
     cost_lcoe_results = pd.read_csv(DATA_DIR / files["cost_lcoe_results"]).set_index("result")["value"]
     cost_parameters = pd.read_csv(DATA_DIR / files["cost_parameters"])
     cost_parameters["value"] = cl.coerce_numeric_column(cost_parameters["value"])
@@ -655,6 +961,14 @@ def _run_results(payload: ResultsComputePayload, system_type: str = "battery"):
             return sr.run_diesel_roi_scenario(ctx["cost_parameters"], params_df, ctx["pv_results"],
                                                ctx["cost_lcoe_results"], ctx["land_cost_options"], ctx["annual_demand_wh"],
                                                ctx["boq_items"])
+        if system_type == "wind_battery":
+            return sr.run_wind_roi_scenario(ctx["cost_parameters"], params_df, ctx["pv_results"],
+                                             ctx["cost_lcoe_results"], ctx["land_cost_options"], ctx["annual_demand_wh"],
+                                             ctx["boq_items"])
+        if system_type == "wind_diesel":
+            return sr.run_wind_diesel_roi_scenario(ctx["cost_parameters"], params_df, ctx["pv_results"],
+                                                    ctx["cost_lcoe_results"], ctx["land_cost_options"], ctx["annual_demand_wh"],
+                                                    ctx["boq_items"])
         return sr.run_roi_scenario(ctx["cost_parameters"], params_df, ctx["pv_parameters"], ctx["pv_results"],
                                     ctx["cost_lcoe_results"], ctx["land_cost_options"], ctx["annual_demand_wh"],
                                     ctx["boq_items"])
@@ -676,6 +990,14 @@ def _run_results(payload: ResultsComputePayload, system_type: str = "battery"):
         master_summary = sr.build_diesel_master_summary(ctx["connected_load"], ctx["annual_demand_wh"], ctx["pv_parameters"],
                                                           ctx["pv_results"], ctx["cost_lcoe_results"], ctx["cost_parameters"],
                                                           roi_params, cashflow)
+    elif system_type == "wind_battery":
+        master_summary = sr.build_wind_battery_master_summary(ctx["connected_load"], ctx["annual_demand_wh"], ctx["pv_parameters"],
+                                                                ctx["pv_results"], ctx["cost_lcoe_results"], ctx["cost_parameters"],
+                                                                roi_params, cashflow)
+    elif system_type == "wind_diesel":
+        master_summary = sr.build_wind_diesel_master_summary(ctx["connected_load"], ctx["annual_demand_wh"], ctx["pv_parameters"],
+                                                               ctx["pv_results"], ctx["cost_lcoe_results"], ctx["cost_parameters"],
+                                                               roi_params, cashflow)
     else:
         master_summary = sr.build_master_summary(ctx["connected_load"], ctx["annual_demand_wh"], ctx["pv_parameters"],
                                                    ctx["pv_results"], ctx["cost_lcoe_results"], ctx["cost_parameters"],
@@ -696,6 +1018,10 @@ def results_save(payload: ResultsComputePayload, system_type: str = "battery"):
     files = _results_filenames(system_type)
     if system_type == "diesel":
         sr.save_diesel_roi_results(roi_params, master_summary, cashflow)
+    elif system_type == "wind_battery":
+        sr.save_wind_battery_roi_results(roi_params, master_summary, cashflow)
+    elif system_type == "wind_diesel":
+        sr.save_wind_diesel_roi_results(roi_params, master_summary, cashflow)
     else:
         sr.save_results(roi_params, master_summary, cashflow)
     roi_params.to_csv(DATA_DIR / files["roi_parameters"], index=False)
@@ -756,6 +1082,21 @@ def results_export(system_type: str = "battery"):
         )
         simulation_path = DATA_DIR / "pv_diesel_simulation_2026.csv"
         selection_title = "Generator Selection"
+    elif system_type == "wind_battery":
+        cost_result = cl.run_wind_cost_lcoe_pipeline(
+            ctx["boq_items"], ctx["land_cost_options"], ctx["cost_parameters"],
+            ctx["pv_results"]["installed_capacity_kw"], ctx["pv_results"]["battery_capacity_kwh"], ctx["pv_results"]["annual_egen_wh"],
+        )
+        simulation_path = DATA_DIR / "wind_battery_simulation_2026.csv"
+        selection_title = "Battery Selection"
+    elif system_type == "wind_diesel":
+        cost_result = cl.run_wind_diesel_cost_lcoe_pipeline(
+            ctx["boq_items"], ctx["land_cost_options"], ctx["cost_parameters"], ctx["pv_results"]["wind_installed_capacity_kw"],
+            ctx["pv_results"]["installed_capacity_kw"], ctx["pv_results"]["annual_fuel_cost_eur"],
+            ctx["annual_demand_wh"] - ctx["pv_results"]["unserved_energy_wh"],
+        )
+        simulation_path = DATA_DIR / "wind_diesel_simulation_2026.csv"
+        selection_title = "Generator Selection"
     else:
         cost_result = cl.run_cost_lcoe_pipeline(
             ctx["boq_items"], ctx["land_cost_options"], ctx["cost_parameters"], ctx["pv_parameters"]["ppeak_w"],
@@ -772,14 +1113,17 @@ def results_export(system_type: str = "battery"):
     )
 
     demand_load = pd.read_csv(DATA_DIR / "hourly_load_profile_2026.csv")
-    irradiance = spv.load_default_irradiance()
-    solar_generation = pd.read_csv(simulation_path) if simulation_path.exists() else pd.DataFrame()
+    is_wind = system_type in ("wind_battery", "wind_diesel")
+    resource_data = wpv.load_default_wind_speed() if is_wind else spv.load_default_irradiance()
+    resource_sheet_name = "Wind Speed Data" if is_wind else "Solar Irradiation Data"
+    generation_sheet_name = "Wind Generation" if is_wind else "Solar Generation"
+    generation = pd.read_csv(simulation_path) if simulation_path.exists() else pd.DataFrame()
 
     sheets = {
         "Overall Summary": master_summary,
         "Demand Load": demand_load,
-        "Solar Irradiation Data": irradiance,
-        "Solar Generation": solar_generation,
+        resource_sheet_name: resource_data,
+        generation_sheet_name: generation,
         selection_title: er.series_to_frame(ctx["pv_results"], "Result", "Value"),
         "Cost Breakdown": cost_result["boq"]["items"],
         "NPV": cashflow["yearly"],
@@ -790,7 +1134,9 @@ def results_export(system_type: str = "battery"):
 
 @router.get("/results/overview")
 def results_overview():
-    """Side-by-side key figures for both scenarios, tolerant of either not being configured/saved yet."""
+    """Side-by-side key figures for every configured scenario, tolerant of any not being saved yet."""
+    is_generator_based = {"battery": False, "diesel": True, "wind_battery": False, "wind_diesel": True}
+
     def _scenario_summary(system_type):
         try:
             ctx = _load_results_context(system_type)
@@ -802,13 +1148,16 @@ def results_overview():
             "capitalCostEur": ctx["cost_lcoe_results"]["capital_cost_eur"],
             "totalOpexEur": ctx["cost_lcoe_results"]["total_opex_eur"],
             "lcoeEurPerKwh": ctx["cost_lcoe_results"]["lcoe_eur_per_kwh"],
-            "unmetOrZeroYieldHours": ctx["pv_results"]["zero_yield_hours"] if system_type == "battery" else ctx["pv_results"]["unmet_hours"],
+            "unmetOrZeroYieldHours": ctx["pv_results"]["unmet_hours"] if is_generator_based[system_type] else ctx["pv_results"]["zero_yield_hours"],
             "roiPct": roi["roi_pct"] if roi else None,
             "npvEur": roi["npv_eur"] if roi else None,
             "simplePaybackYears": roi.get("simple_payback_years") if roi else None,
         }
 
-    return native({"battery": _scenario_summary("battery"), "diesel": _scenario_summary("diesel")})
+    return native({
+        "battery": _scenario_summary("battery"), "diesel": _scenario_summary("diesel"),
+        "wind_battery": _scenario_summary("wind_battery"), "wind_diesel": _scenario_summary("wind_diesel"),
+    })
 
 
 # ---------------------------------------------------------------------------

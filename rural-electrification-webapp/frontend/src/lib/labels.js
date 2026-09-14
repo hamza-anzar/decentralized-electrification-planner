@@ -33,6 +33,12 @@ export const PARAM_LABELS = {
   fuel_price_eur_per_liter: "Fuel Price",
   // Diesel cost parameters
   generator_overhaul_pct: "Generator Overhaul Cost (%)",
+  // Wind parameters
+  turbine_model: "Turbine Model",
+  turbine_count: "Number of Turbines",
+  reference_height_m: "Reference Height (Wind Data)",
+  hub_height_m: "Turbine Hub Height",
+  shear_exponent_alpha: "Wind Shear Exponent (α)",
   // BOQ columns (used as table headers, not parameter rows, but kept here for one shared lookup)
   qty: "Qty",
   unit_cost_eur: "Unit Cost (EUR)",

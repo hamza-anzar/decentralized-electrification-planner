@@ -11,6 +11,8 @@ const VIEWS = [
   { value: "overview", label: "Overview" },
   { value: "battery", label: "Solar + Battery" },
   { value: "diesel", label: "Solar + Diesel" },
+  { value: "wind_battery", label: "Wind + Battery" },
+  { value: "wind_diesel", label: "Wind + Diesel" },
 ];
 
 export default function Results() {

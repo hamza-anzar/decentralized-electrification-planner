@@ -17,6 +17,7 @@ deleted/
 .DS_Store
 Thumbs.db
 .vscode/
+.claude/
 
 # Excel lock files (created while Base-Calculations-00.xlsx is open)
 ~$*.xlsx

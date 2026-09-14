@@ -1,0 +1,8 @@
+item_no,description,qty,unit,unit_cost_eur,system_unit,lumpsum_unit_cost_eur,total_cost_eur
+1,Wind Turbine(s),,,,kW,2972.33,0.0
+2,Inverter,1.0,Lot,28282.83,,,0.0
+3,Auxiliaries & Civil Works,1.0,Lot,113131.31,,,0.0
+4,Electrical Collection System,1.0,Lot,7727.27,,,0.0
+5,Diesel Generator(s),,,,kW,500.0,0.0
+6,Generator Installation & Commissioning,,,,kW,75.0,0.0
+7,Cables & Distribution Infrastructure,1.0,Lot,121212.121212121,,,0.0

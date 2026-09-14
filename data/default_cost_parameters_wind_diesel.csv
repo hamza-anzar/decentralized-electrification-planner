@@ -1,0 +1,12 @@
+parameter,value,unit,description
+insurance_pct_per_year,0.005,fraction/year,"Insurance cost, as a fraction of capital cost per year"
+om_eur_per_kw_per_year,25.0,EUR/kW/year,"Operations & maintenance cost per kW of installed turbine capacity per year — PLACEHOLDER, wind turbines typically run higher O&M per kW/yr than solar (gearbox/pitch/yaw systems)"
+land_cost_approach,govt_lease,buy | private_lease | govt_lease | none,Which land-cost figure (if any) is included in the totals (same shared options as Solar+Battery)
+eur_to_pkr_rate,330.0,PKR/EUR,Exchange rate — multiply a EUR figure by this to display it in PKR
+eur_to_usd_rate,1.17857142857143,USD/EUR,Exchange rate — multiply a EUR figure by this to display it in USD
+inflation_rate,0.08,fraction/year,Annual inflation applied to the O&M and fuel cash flow
+discount_rate,0.1,fraction/year,Annual discount rate used to present-value the O&M and fuel cash flow
+generator_overhaul_pct,0.15,fraction,"Major generator overhaul cost at the replacement year, as a fraction of generator capex (mirrors the Solar+Battery scenario's inverter-replacement line)"
+project_lifetime_years,30.0,years,Project lifetime used for the O&M/fuel cash-flow horizon and the LCOE energy denominator
+use_lump_sum_capex,0.0,0 or 1 (boolean),"If 1, override the itemized BOQ total with lump_sum_capex_eur below"
+lump_sum_capex_eur,500000.0,EUR,Used only when use_lump_sum_capex=1 — a single all-in capital cost figure

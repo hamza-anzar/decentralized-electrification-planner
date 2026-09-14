@@ -1,0 +1,16 @@
+result,value,unit,description
+annual_egen_wh,4208063451.7782693,Wh,Total annual wind generation at the selected turbine count
+annual_demand_wh,3861988499.0261583,Wh,Total annual demand
+peak_deficit_w,1466703.7600413442,W,Worst single-hour shortfall wind alone can't cover — drives generator sizing
+recommended_generator_kw,1800.0,kW,"Recommended total generator capacity (peak deficit + safety margin, rounded up)"
+generator_unit_size_kw,1800.0,kW,"Size of a single generator unit, as configured"
+generator_count,1.0,units,"Number of generator units, as configured"
+installed_capacity_kw,1800.0,kW,Total installed GENERATOR capacity (unit size x count)
+unmet_hours,0.0,hours/year,Hours per year where wind + generator together still can't cover demand (unserved) — the diesel scenario's equivalent of zero-yield hours
+unserved_energy_wh,0.0,Wh,Total annual energy shortfall during unmet hours
+annual_generator_output_wh,1636315355.3662913,Wh,Total annual generator output
+annual_fuel_liters,490894.6066098873,L,Total annual diesel fuel consumption
+annual_fuel_cost_eur,490894.6066098873,EUR,Total annual diesel fuel cost
+turbine_count,4.0,units,"Number of turbines, as configured"
+rated_power_kw,500.0,kW,"Selected turbine's rated (plateau) power, per unit"
+wind_installed_capacity_kw,2000.0,kW,Total installed TURBINE capacity (rated power x turbine count) — drives the BOQ's Wind Turbine(s) line and part of O&M

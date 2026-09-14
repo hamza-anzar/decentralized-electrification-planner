@@ -1,0 +1,6 @@
+parameter,value,unit,description
+turbine_model,GP56-500,model,"Selected turbine model from the library (or ""custom"" for an uploaded power curve)"
+turbine_count,4,units,Number of turbines installed
+reference_height_m,10.0,m,Height the wind-speed dataset is referenced to (NASA POWER / the bundled default both report at 10m)
+hub_height_m,51.0,m,Selected turbine's hub height — used to shear-correct the reference-height wind speed up to the rotor
+shear_exponent_alpha,0.14,fraction,Wind-shear power-law exponent (v(hub) = v(ref) x (hub_height/reference_height)^alpha) — 0.14 is typical for open/coastal terrain

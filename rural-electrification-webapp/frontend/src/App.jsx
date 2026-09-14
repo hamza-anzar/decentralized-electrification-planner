@@ -11,7 +11,7 @@ import { STEPS } from "./lib/steps";
 const LoadSetup = lazy(() => import("./pages/LoadSetup"));
 const DemandProfile = lazy(() => import("./pages/DemandProfile"));
 const EnergyInsights = lazy(() => import("./pages/EnergyInsights"));
-const SolarDesign = lazy(() => import("./pages/SolarDesign"));
+const SystemDesign = lazy(() => import("./pages/SystemDesign"));
 const Financials = lazy(() => import("./pages/Financials"));
 const Results = lazy(() => import("./pages/Results"));
 
@@ -19,7 +19,7 @@ const BUILT_PAGES = {
   loadSetup: LoadSetup,
   demandProfile: DemandProfile,
   energyInsights: EnergyInsights,
-  solarDesign: SolarDesign,
+  solarDesign: SystemDesign,
   financials: Financials,
   results: Results,
 };

@@ -1,0 +1,7 @@
+parameter,value,unit,description
+generator_unit_size_kw,1800.0,kW,Nameplate size of a single generator unit
+generator_count,1.0,units,Number of generator units installed (e.g. 2 x 1000 kW instead of 1 x 2000 kW)
+capacity_margin_pct,20.0,fraction,Safety margin added above the peak calculated deficit before rounding — standard headroom for motor-starting inrush and to avoid continuous 100% loading
+rounding_increment_kw,100.0,kW,Recommended generator size is rounded UP (never down) to the nearest multiple of this
+fuel_consumption_l_per_kwh,0.3,L/kWh,Average diesel fuel consumption per kWh generated — a placeholder (typical mid-size genset average); replace with your generator's real fuel curve if known
+fuel_price_eur_per_liter,1.0,EUR/L,PLACEHOLDER — local diesel fuel price; replace with a real figure for your site

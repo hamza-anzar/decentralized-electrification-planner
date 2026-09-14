@@ -22,8 +22,10 @@ def build_default_roi_parameters(lcoe_eur_per_kwh: float, system_type: str = "ba
     """The break-even placeholder tariff (= LCOE), 0% escalation, replacement at year 12, 3%/yr load
     growth — same as the notebook plus the load-growth addition. `replacement_year`'s description
     names whichever component actually gets replaced for this scenario."""
+    is_diesel = system_type in ("diesel", "wind_diesel")
+    source_label = "Wind" if system_type in ("wind_battery", "wind_diesel") else "PV"
     replacement_desc = (
-        "Year the generator overhaul cost hits as a one-time outflow" if system_type == "diesel"
+        "Year the generator overhaul cost hits as a one-time outflow" if is_diesel
         else "Year the battery and inverter replacement costs hit as a one-time outflow"
     )
     return pd.DataFrame([
@@ -34,7 +36,8 @@ def build_default_roi_parameters(lcoe_eur_per_kwh: float, system_type: str = "ba
         {"parameter": "annual_load_growth_pct", "value": 3.0, "unit": "%/year",
          "description": "Compound annual demand growth applied to the cash-flow's energy served (Energy(year n) = Energy(year 1) x "
                          "(1+g)^(n-1)) — depends on population growth, income/economic growth, increasing connection rate, and "
-                         f"productive-use uptake. Typical mini-grid range 3-8%/year; does not resize the physical PV/{'generator' if system_type == 'diesel' else 'battery'} system."},
+                         f"productive-use uptake. Typical mini-grid range 3-8%/year; does not resize the physical {source_label}/"
+                         f"{'generator' if is_diesel else 'battery'} system."},
     ])
 
 
@@ -313,6 +316,155 @@ def save_diesel_roi_results(roi_parameters: pd.DataFrame, master_summary: pd.Dat
         "simple_payback_years": cashflow["simple_payback_years"], "discounted_payback_years": cashflow["discounted_payback_years"],
     }])
     roi_results.to_csv(DATA_DIR / "roi_results_diesel_2026.csv", index=False)
+
+
+# ---------------------------------------------------------------------------
+# Wind Turbine + Battery / Wind Turbine + Diesel Generator scenarios — same cash-flow engine as their
+# solar counterparts. get_boq_land_battery()/get_boq_land_diesel_extras()/compute_om_cash_flow()/
+# compute_fuel_cash_flow()/simulate_project_cashflow() are all reused completely unchanged (already
+# generation-technology-agnostic); only the O&M capacity basis (installed turbine kW instead of PV
+# Ppeak) and the master-summary labels differ.
+# ---------------------------------------------------------------------------
+
+def run_wind_roi_scenario(cost_parameters_df: pd.DataFrame, roi_parameters_df: pd.DataFrame,
+                           wind_battery_results: pd.Series, cost_lcoe_results: pd.Series,
+                           land_cost_options_df: pd.DataFrame, annual_demand_wh: float,
+                           boq_items_df: pd.DataFrame) -> dict:
+    """Wind+Battery analog of run_roi_scenario(): O&M scales off installed turbine kW (from the sizing
+    results) instead of PV Ppeak; battery/inverter replacement reuse get_boq_land_battery() unchanged."""
+    cost_parameters_df = cost_parameters_df.copy()
+    cost_parameters_df["value"] = coerce_numeric_column(cost_parameters_df["value"])
+
+    extras = get_boq_land_battery(cost_parameters_df, wind_battery_results, cost_lcoe_results, land_cost_options_df, boq_items_df)
+    installed_capacity_kw = wind_battery_results["installed_capacity_kw"]
+    om_cash_flow = compute_om_cash_flow(
+        cost_lcoe_results["capital_cost_eur"], get_param(cost_parameters_df, "insurance_pct_per_year"),
+        get_param(cost_parameters_df, "om_eur_per_kw_per_year"), installed_capacity_kw,
+        get_param(cost_parameters_df, "inflation_rate"), years=extras["years"],
+    )
+    annual_energy_served_kwh = annual_demand_wh / 1000  # simplification: treats all demand as served
+
+    cashflow = simulate_project_cashflow(
+        cost_lcoe_results["capital_cost_eur"], annual_energy_served_kwh,
+        extras["battery_capex_eur"], extras["inverter_replacement_eur"], extras["land_annual_cost_eur"],
+        om_cash_flow, roi_parameters_df, get_param(cost_parameters_df, "discount_rate"), years=extras["years"],
+    )
+    return {"cashflow": cashflow, "extras": extras, "om_cash_flow": om_cash_flow, "annual_energy_served_kwh": annual_energy_served_kwh}
+
+
+def build_wind_battery_master_summary(connected_load: pd.Series, annual_demand_wh: float, wind_parameters: pd.Series,
+                                       wind_battery_results: pd.Series, cost_lcoe_results: pd.Series, cost_parameters_df: pd.DataFrame,
+                                       roi_parameters_df: pd.DataFrame, cashflow: dict) -> pd.DataFrame:
+    """Wind+Battery analog of build_master_summary(): swaps the PV-array/Egen rows for turbine-count/
+    installed-capacity rows; everything else is structurally identical."""
+    eur_to_pkr = get_param(cost_parameters_df, "eur_to_pkr_rate")
+    eur_to_usd = get_param(cost_parameters_df, "eur_to_usd_rate")
+    tariff = get_param(roi_parameters_df, "electricity_tariff_eur_per_kwh")
+
+    return pd.DataFrame([
+        {"section": "Load", "metric": "Total connected load", "value": connected_load["total_connected_load_mw"], "unit": "MW"},
+        {"section": "Load", "metric": "Annual demand", "value": annual_demand_wh / 1e9, "unit": "GWh/year"},
+        {"section": "Wind / Battery", "metric": "Turbine count", "value": wind_battery_results["turbine_count"], "unit": "units"},
+        {"section": "Wind / Battery", "metric": "Installed turbine capacity", "value": wind_battery_results["installed_capacity_kw"], "unit": "kW"},
+        {"section": "Wind / Battery", "metric": "Annual generation (Egen)", "value": wind_battery_results["annual_egen_wh"] / 1e9, "unit": "GWh/year"},
+        {"section": "Wind / Battery", "metric": "Battery capacity", "value": wind_battery_results["battery_capacity_kwh"], "unit": "kWh"},
+        {"section": "Wind / Battery", "metric": "Zero-yield hours", "value": wind_battery_results["zero_yield_hours"], "unit": "h/year"},
+        {"section": "Cost", "metric": "Capital cost (Capex)", "value": cost_lcoe_results["capital_cost_eur"], "unit": "EUR"},
+        {"section": "Cost", "metric": "Capital cost (Capex)", "value": convert_currency(cost_lcoe_results["capital_cost_eur"], "USD", eur_to_pkr, eur_to_usd), "unit": "USD"},
+        {"section": "Cost", "metric": "Total Opex (30yr, present value basis)", "value": cost_lcoe_results["total_opex_eur"], "unit": "EUR"},
+        {"section": "Cost", "metric": "Total cost (Capex+Opex)", "value": cost_lcoe_results["total_cost_eur"], "unit": "EUR"},
+        {"section": "Cost", "metric": "LCOE (generation-based)", "value": cost_lcoe_results["lcoe_eur_per_kwh"], "unit": "EUR/kWh"},
+        {"section": "ROI", "metric": "Tariff used", "value": tariff, "unit": "EUR/kWh"},
+        {"section": "ROI", "metric": "NPV", "value": cashflow["npv_eur"], "unit": "EUR"},
+        {"section": "ROI", "metric": "Lifetime ROI", "value": cashflow["roi_pct"], "unit": "%"},
+        {"section": "ROI", "metric": "Simple payback", "value": cashflow["simple_payback_years"], "unit": "years"},
+        {"section": "ROI", "metric": "Discounted payback", "value": cashflow["discounted_payback_years"], "unit": "years"},
+    ])
+
+
+def save_wind_battery_roi_results(roi_parameters: pd.DataFrame, master_summary: pd.DataFrame, cashflow: dict) -> None:
+    roi_parameters.to_csv(DATA_DIR / "default_roi_parameters_wind_battery.csv", index=False)
+    master_summary.to_csv(DATA_DIR / "master_summary_wind_battery_2026.csv", index=False)
+    roi_results = pd.DataFrame([{
+        "tariff_eur_per_kwh": get_param(roi_parameters, "electricity_tariff_eur_per_kwh"),
+        "npv_eur": cashflow["npv_eur"], "roi_pct": cashflow["roi_pct"],
+        "simple_payback_years": cashflow["simple_payback_years"], "discounted_payback_years": cashflow["discounted_payback_years"],
+    }])
+    roi_results.to_csv(DATA_DIR / "roi_results_wind_battery_2026.csv", index=False)
+
+
+def run_wind_diesel_roi_scenario(cost_parameters_df: pd.DataFrame, roi_parameters_df: pd.DataFrame,
+                                  wind_diesel_results: pd.Series, cost_lcoe_results: pd.Series,
+                                  land_cost_options_df: pd.DataFrame, annual_energy_served_wh: float,
+                                  boq_items_df: pd.DataFrame) -> dict:
+    """Wind+Diesel analog of run_diesel_roi_scenario(): O&M scales off combined turbine+generator
+    installed kW; recurring fuel cost and the one-time generator overhaul reuse
+    get_boq_land_diesel_extras()/compute_fuel_cash_flow() unchanged."""
+    cost_parameters_df = cost_parameters_df.copy()
+    cost_parameters_df["value"] = coerce_numeric_column(cost_parameters_df["value"])
+
+    extras = get_boq_land_diesel_extras(cost_parameters_df, wind_diesel_results, cost_lcoe_results, land_cost_options_df, boq_items_df)
+    total_installed_kw = wind_diesel_results["wind_installed_capacity_kw"] + wind_diesel_results["installed_capacity_kw"]
+    om_cash_flow = compute_om_cash_flow(
+        cost_lcoe_results["capital_cost_eur"], get_param(cost_parameters_df, "insurance_pct_per_year"),
+        get_param(cost_parameters_df, "om_eur_per_kw_per_year"), total_installed_kw,
+        get_param(cost_parameters_df, "inflation_rate"), years=extras["years"],
+    )
+    fuel_cash_flow = compute_fuel_cash_flow(
+        wind_diesel_results["annual_fuel_cost_eur"], get_param(cost_parameters_df, "inflation_rate"), years=extras["years"],
+    )
+    total_recurring_cash_flow = om_cash_flow + fuel_cash_flow
+    annual_energy_served_kwh = annual_energy_served_wh / 1000
+
+    cashflow = simulate_project_cashflow(
+        cost_lcoe_results["capital_cost_eur"], annual_energy_served_kwh,
+        extras["replacement_capex_eur"], 0.0, extras["land_annual_cost_eur"],
+        total_recurring_cash_flow, roi_parameters_df, get_param(cost_parameters_df, "discount_rate"), years=extras["years"],
+    )
+    return {"cashflow": cashflow, "extras": extras, "om_cash_flow": total_recurring_cash_flow,
+            "annual_energy_served_kwh": annual_energy_served_kwh}
+
+
+def build_wind_diesel_master_summary(connected_load: pd.Series, annual_demand_wh: float, wind_parameters: pd.Series,
+                                      wind_diesel_results: pd.Series, cost_lcoe_results: pd.Series, cost_parameters_df: pd.DataFrame,
+                                      roi_parameters_df: pd.DataFrame, cashflow: dict) -> pd.DataFrame:
+    """Wind+Diesel analog of build_diesel_master_summary(): turbine-count/installed-capacity rows in
+    place of the PV-array rows; everything else is structurally identical."""
+    eur_to_pkr = get_param(cost_parameters_df, "eur_to_pkr_rate")
+    eur_to_usd = get_param(cost_parameters_df, "eur_to_usd_rate")
+    tariff = get_param(roi_parameters_df, "electricity_tariff_eur_per_kwh")
+
+    return pd.DataFrame([
+        {"section": "Load", "metric": "Total connected load", "value": connected_load["total_connected_load_mw"], "unit": "MW"},
+        {"section": "Load", "metric": "Annual demand", "value": annual_demand_wh / 1e9, "unit": "GWh/year"},
+        {"section": "Wind / Generator", "metric": "Turbine count", "value": wind_diesel_results["turbine_count"], "unit": "units"},
+        {"section": "Wind / Generator", "metric": "Installed turbine capacity", "value": wind_diesel_results["wind_installed_capacity_kw"], "unit": "kW"},
+        {"section": "Wind / Generator", "metric": "Annual wind generation (Egen)", "value": wind_diesel_results["annual_egen_wh"] / 1e9, "unit": "GWh/year"},
+        {"section": "Wind / Generator", "metric": "Installed generator capacity", "value": wind_diesel_results["installed_capacity_kw"], "unit": "kW"},
+        {"section": "Wind / Generator", "metric": "Annual fuel consumption", "value": wind_diesel_results["annual_fuel_liters"], "unit": "L/year"},
+        {"section": "Wind / Generator", "metric": "Unmet-demand hours", "value": wind_diesel_results["unmet_hours"], "unit": "h/year"},
+        {"section": "Cost", "metric": "Capital cost (Capex)", "value": cost_lcoe_results["capital_cost_eur"], "unit": "EUR"},
+        {"section": "Cost", "metric": "Capital cost (Capex)", "value": convert_currency(cost_lcoe_results["capital_cost_eur"], "USD", eur_to_pkr, eur_to_usd), "unit": "USD"},
+        {"section": "Cost", "metric": "Total Opex (30yr, present value basis)", "value": cost_lcoe_results["total_opex_eur"], "unit": "EUR"},
+        {"section": "Cost", "metric": "Total cost (Capex+Opex)", "value": cost_lcoe_results["total_cost_eur"], "unit": "EUR"},
+        {"section": "Cost", "metric": "LCOE", "value": cost_lcoe_results["lcoe_eur_per_kwh"], "unit": "EUR/kWh"},
+        {"section": "ROI", "metric": "Tariff used", "value": tariff, "unit": "EUR/kWh"},
+        {"section": "ROI", "metric": "NPV", "value": cashflow["npv_eur"], "unit": "EUR"},
+        {"section": "ROI", "metric": "Lifetime ROI", "value": cashflow["roi_pct"], "unit": "%"},
+        {"section": "ROI", "metric": "Simple payback", "value": cashflow["simple_payback_years"], "unit": "years"},
+        {"section": "ROI", "metric": "Discounted payback", "value": cashflow["discounted_payback_years"], "unit": "years"},
+    ])
+
+
+def save_wind_diesel_roi_results(roi_parameters: pd.DataFrame, master_summary: pd.DataFrame, cashflow: dict) -> None:
+    roi_parameters.to_csv(DATA_DIR / "default_roi_parameters_wind_diesel.csv", index=False)
+    master_summary.to_csv(DATA_DIR / "master_summary_wind_diesel_2026.csv", index=False)
+    roi_results = pd.DataFrame([{
+        "tariff_eur_per_kwh": get_param(roi_parameters, "electricity_tariff_eur_per_kwh"),
+        "npv_eur": cashflow["npv_eur"], "roi_pct": cashflow["roi_pct"],
+        "simple_payback_years": cashflow["simple_payback_years"], "discounted_payback_years": cashflow["discounted_payback_years"],
+    }])
+    roi_results.to_csv(DATA_DIR / "roi_results_wind_diesel_2026.csv", index=False)
 
 
 # --- Excel round-trip: ROI parameters ---

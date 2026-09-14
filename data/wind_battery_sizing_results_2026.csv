@@ -1,0 +1,9 @@
+result,value,unit,description
+annual_egen_wh,3866964105.768166,Wh,Total annual wind generation at the selected turbine count
+annual_demand_wh,3861988499.0261583,Wh,Total annual demand
+worst_deficit_block_wh,-92007119.35375637,Wh,Worst single contiguous deficit run — drives battery sizing
+battery_capacity_kwh,98000.0,kWh,Sized battery capacity
+zero_yield_hours,2251.0,hours/year,Hours per year the battery is fully depleted (unserved demand) at the sized capacity
+turbine_count,2.0,units,"Number of turbines, as configured"
+rated_power_kw,500.0,kW,"Selected turbine's rated (plateau) power, per unit"
+installed_capacity_kw,1000.0,kW,Total installed turbine capacity (rated power x turbine count) — drives the BOQ's Wind Turbine(s) line and O&M

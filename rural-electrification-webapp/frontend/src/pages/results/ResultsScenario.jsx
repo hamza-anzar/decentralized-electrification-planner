@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  MapPin, Home, Users, Sun, BatteryCharging, TimerOff, CalendarClock, Zap,
+  MapPin, Home, Users, Sun, Wind, BatteryCharging, TimerOff, CalendarClock, Zap,
   Coins, Receipt, TrendingUp, Hourglass, Wallet, Download,
 } from "lucide-react";
 import { Card, SectionHeader } from "../../components/Card";
@@ -18,8 +18,12 @@ import { humanizeParam } from "../../lib/labels";
 import { convertCurrency, fmtNumber } from "../../lib/format";
 import { gaugeChart, cumulativeCashflowChart } from "../../lib/charts";
 
+const SCENARIO_LABELS = { battery: "Solar+Battery", diesel: "Solar+Diesel", wind_battery: "Wind+Battery", wind_diesel: "Wind+Diesel" };
+
 export default function ResultsScenario({ systemType, color }) {
-  const isDiesel = systemType === "diesel";
+  const isDiesel = systemType === "diesel" || systemType === "wind_diesel";
+  const isWind = systemType === "wind_battery" || systemType === "wind_diesel";
+  const scenarioLabel = SCENARIO_LABELS[systemType] || systemType;
   const { data: ctx, loading: ctxLoading, error: ctxError } = useApiGet(`/api/results/context?system_type=${systemType}`);
   const { refetchProgress } = useProgress();
 
@@ -135,8 +139,8 @@ export default function ResultsScenario({ systemType, color }) {
   if (ctxError || !ctx) {
     return (
       <Alert type="error">
-        Missing results from earlier steps — visit and save Load Setup, Demand Profile, Solar Design's{" "}
-        {isDiesel ? "Diesel" : "Battery"} tab, and Financials' {isDiesel ? "Diesel" : "Battery"} tab first.
+        Missing results from earlier steps — visit and save Load Setup, Demand Profile, System Design's{" "}
+        {scenarioLabel} tab, and Financials' {scenarioLabel} tab first.
       </Alert>
     );
   }
@@ -180,7 +184,11 @@ export default function ResultsScenario({ systemType, color }) {
       <Card>
         <SectionHeader title="System & Cost Summary" color={color} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard icon={Sun} label="System Size (Ppeak)" value={ctx.pvParameters.ppeak_w / 1e6} decimals={3} suffix=" MW" color="#eda100" />
+          {isWind ? (
+            <KpiCard icon={Wind} label="Installed Turbine Capacity" value={isDiesel ? ctx.pvResults.wind_installed_capacity_kw : ctx.pvResults.installed_capacity_kw} decimals={0} suffix=" kW" color="#eda100" />
+          ) : (
+            <KpiCard icon={Sun} label="System Size (Ppeak)" value={ctx.pvParameters.ppeak_w / 1e6} decimals={3} suffix=" MW" color="#eda100" />
+          )}
           {isDiesel ? (
             <KpiCard icon={Zap} label="Generator Capacity" value={ctx.pvResults.installed_capacity_kw} decimals={0} suffix=" kW" color="#2a78d6" />
           ) : (
@@ -189,7 +197,7 @@ export default function ResultsScenario({ systemType, color }) {
           <KpiCard icon={TimerOff} label="No-Electricity Hours" value={isDiesel ? ctx.pvResults.unmet_hours : ctx.pvResults.zero_yield_hours} decimals={0} suffix=" h/yr" color="#eb6834" />
           <KpiCard icon={CalendarClock} label="Project Lifetime" value={ctx.projectLifetimeYears} decimals={0} suffix=" yrs" color="#7a5cd6" />
           <KpiCard icon={Zap} label="Annual Demand" value={ctx.annualDemandWh / 1e9} decimals={4} suffix=" GWh" color="#2a78d6" />
-          <KpiCard icon={Sun} label="Annual Generation" value={ctx.pvResults.annual_egen_wh / 1e9} decimals={4} suffix=" GWh" color="#eda100" />
+          <KpiCard icon={isWind ? Wind : Sun} label={isWind ? "Annual Wind Generation" : "Annual Generation"} value={ctx.pvResults.annual_egen_wh / 1e9} decimals={4} suffix=" GWh" color="#eda100" />
           <KpiCard icon={Coins} label="Investment Cost" value={conv(ctx.costLcoeResults.capital_cost_eur)} compactWords suffix={` ${currency}`} color="#1baf7a" />
           <KpiCard icon={Receipt} label="LCOE" value={conv(ctx.costLcoeResults.lcoe_eur_per_kwh)} decimals={4} suffix={` ${currency}/kWh`} color="#d65c9e" />
         </div>

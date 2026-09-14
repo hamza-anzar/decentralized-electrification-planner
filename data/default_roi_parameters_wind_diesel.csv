@@ -1,0 +1,5 @@
+parameter,value,unit,description
+electricity_tariff_eur_per_kwh,0.1443934381430051,EUR/kWh,PLACEHOLDER — defaults to break-even (= LCOE). Replace with a real planned tariff or avoided-cost figure for a meaningful ROI.
+revenue_escalation_rate,0.0,fraction/year,Annual growth rate applied to the tariff/revenue (0 = flat)
+replacement_year,12.0,year,Year the generator overhaul cost hits as a one-time outflow
+annual_load_growth_pct,3.0,%/year,"Compound annual demand growth applied to the cash-flow's energy served (Energy(year n) = Energy(year 1) x (1+g)^(n-1)) — depends on population growth, income/economic growth, increasing connection rate, and productive-use uptake. Typical mini-grid range 3-8%/year; does not resize the physical Wind/generator system."

@@ -296,11 +296,11 @@ export function batterySensitivityChart(sensitivity, selectedKwh, selectedHours)
   return option;
 }
 
-export function egenVsDemandChart(simulation, startDay) {
+export function egenVsDemandChart(simulation, startDay, genLabel = "PV Generation") {
   const rows = simulation.filter((r) => r.hour_of_year > (startDay - 1) * 24 && r.hour_of_year <= (startDay + 6) * 24);
   const x = rows.map((r) => String(r.hour_of_year));
   return {
-    title: { text: "Demand vs. PV Generation vs. Battery SOC (one week)", left: "center", textStyle: TITLE_STYLE },
+    title: { text: `Demand vs. ${genLabel} vs. Battery SOC (one week)`, left: "center", textStyle: TITLE_STYLE },
     tooltip: { trigger: "axis" },
     legend: { top: 30, textStyle: AXIS_LABEL },
     grid: { left: 55, right: 65, top: 68, bottom: 42, containLabel: true },
@@ -311,7 +311,7 @@ export function egenVsDemandChart(simulation, startDay) {
     ],
     series: [
       { name: "Demand (kWh)", type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.demand_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.B, width: 2 } },
-      { name: "PV Generation (kWh)", type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.egen_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.C, width: 2 } },
+      { name: `${genLabel} (kWh)`, type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.egen_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.C, width: 2 } },
       { name: "Battery SOC (kWh)", type: "line", showSymbol: false, yAxisIndex: 1, data: rows.map((r) => Math.round((r.battery_soc_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.A, width: 2, type: "dotted" } },
     ],
     animationDuration: 500,
@@ -339,7 +339,48 @@ export function irradianceVsDemandChart(simulation, startDay, days = 7) {
   };
 }
 
-export function duckCurveChart(simulation, day = null) {
+export function windSpeedVsDemandChart(simulation, startDay, days = 7) {
+  const rows = simulation.filter((r) => r.hour_of_year > (startDay - 1) * 24 && r.hour_of_year <= (startDay + days - 1) * 24);
+  const x = rows.map((r) => String(r.hour_of_year));
+  return {
+    title: { text: "Hourly Wind Speed vs. Demand Profile", left: "center", textStyle: TITLE_STYLE },
+    tooltip: { trigger: "axis" },
+    legend: { top: 30, textStyle: AXIS_LABEL },
+    grid: { left: 55, right: 65, top: 68, bottom: 42, containLabel: true },
+    xAxis: { type: "category", name: "Hour of year", nameGap: 26, data: x, axisLine: AXIS_LINE, axisLabel: AXIS_LABEL },
+    yAxis: [
+      { type: "value", name: "Demand (kWh)", nameGap: 14, splitLine: SPLIT_LINE, axisLine: AXIS_LINE, axisLabel: AXIS_LABEL },
+      { type: "value", name: "Wind Speed at Hub (m/s)", nameGap: 14, splitLine: { show: false }, axisLine: AXIS_LINE, axisLabel: AXIS_LABEL },
+    ],
+    series: [
+      { name: "Demand (kWh)", type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.demand_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.B, width: 2 } },
+      { name: "Wind Speed at Hub (m/s)", type: "line", showSymbol: false, yAxisIndex: 1, data: rows.map((r) => Math.round(r.wind_speed_ms * 100) / 100), lineStyle: { color: CATEGORY_COLORS.Misc, width: 2, type: "dotted" } },
+    ],
+    animationDuration: 500,
+  };
+}
+
+export function windSpeedHistogramChart(simulation) {
+  // Frequency of hours by wind speed, rounded to the nearest 0.5 m/s — the Weibull-style histogram
+  // the source workbook used for turbine-selection decision making.
+  const buckets = new Map();
+  for (const r of simulation) {
+    const bucket = Math.round(r.wind_speed_ms * 2) / 2;
+    buckets.set(bucket, (buckets.get(bucket) || 0) + 1);
+  }
+  const bins = [...buckets.keys()].sort((a, b) => a - b);
+  const option = shell("Wind Speed Frequency Distribution (Histogram)", bins.map((b) => b.toFixed(1)), "Wind speed at hub (m/s, 0.5 m/s bins)", "Hours per year", false);
+  option.series = [
+    {
+      name: "Hours per year", type: "bar", barWidth: "80%",
+      data: bins.map((b) => buckets.get(b)),
+      itemStyle: { color: CATEGORY_COLORS.A },
+    },
+  ];
+  return option;
+}
+
+export function duckCurveChart(simulation, day = null, genLabel = "PV Generation") {
   let x, demand, netLoad, title;
   const withNet = simulation.map((r) => ({ ...r, net_load_kwh: (r.demand_wh - r.egen_wh) / 1000 }));
 
@@ -367,7 +408,7 @@ export function duckCurveChart(simulation, day = null) {
   option.series = [
     { name: day !== null ? "Demand (kWh)" : "Average Demand (kWh)", type: "line", showSymbol: false, data: demand.map((v) => Math.round(v * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.B, width: 1.5, type: "dotted" } },
     {
-      name: day !== null ? "Net Load = Demand − PV Generation (kWh)" : "Average Net Load = Demand − PV Generation (kWh)",
+      name: day !== null ? `Net Load = Demand − ${genLabel} (kWh)` : `Average Net Load = Demand − ${genLabel} (kWh)`,
       type: "line", showSymbol: false, data: netLoad.map((v) => Math.round(v * 1000) / 1000),
       lineStyle: { color: CATEGORY_COLORS.A, width: 2.5 },
       markLine: { data: [{ yAxis: 0 }], silent: true, lineStyle: { color: AXIS_INK, type: "dashed" }, label: { show: false } },
@@ -376,23 +417,23 @@ export function duckCurveChart(simulation, day = null) {
   return option;
 }
 
-export function generatorDispatchChart(simulation, startDay) {
+export function generatorDispatchChart(simulation, startDay, genLabel = "PV Generation") {
   const rows = simulation.filter((r) => r.hour_of_year > (startDay - 1) * 24 && r.hour_of_year <= (startDay + 6) * 24);
   const x = rows.map((r) => String(r.hour_of_year));
-  const option = shell("Demand vs. PV Generation vs. Generator Output (one week)", x, "Hour of year", "Energy (kWh)");
+  const option = shell(`Demand vs. ${genLabel} vs. Generator Output (one week)`, x, "Hour of year", "Energy (kWh)");
   option.series = [
     { name: "Demand (kWh)", type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.demand_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.B, width: 2 } },
-    { name: "PV Generation (kWh)", type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.egen_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.C, width: 2 } },
+    { name: `${genLabel} (kWh)`, type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.egen_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.C, width: 2 } },
     { name: "Generator Output (kWh)", type: "line", showSymbol: false, data: rows.map((r) => Math.round((r.generator_output_wh / 1000) * 1000) / 1000), lineStyle: { color: CATEGORY_COLORS.Misc, width: 2, type: "dashed" } },
   ];
   return option;
 }
 
-export function deficitLoadDurationChart(loadDurationCurve, installedCapacityKw, recommendedKw) {
+export function deficitLoadDurationChart(loadDurationCurve, installedCapacityKw, recommendedKw, sourceLabel = "PV") {
   const x = loadDurationCurve.map((r) => String(r.hour_rank));
   const option = shell(
     "Deficit Load Duration Curve — Generator Sizing",
-    x, "Hours per year (sorted, worst first)", "PV Shortfall / Required Generator Output (kW)"
+    x, "Hours per year (sorted, worst first)", `${sourceLabel} Shortfall / Required Generator Output (kW)`
   );
   option.series = [
     {
@@ -427,16 +468,15 @@ export function boqCostBreakdownPieChart(boqItems, currency = "EUR") {
 
 // --- Results ---
 
-export function scenarioComparisonBarChart(title, yName, batteryValue, dieselValue, decimals = 2) {
-  const option = shell(title, ["Solar + Battery", "Solar + Diesel"], "", yName, false);
+// `series`: [{ label, value, color }, ...] — any number of scenarios side by side (2 for the original
+// Battery/Diesel comparison, up to 4 once Wind+Battery/Wind+Diesel are configured too).
+export function scenarioComparisonBarChart(title, yName, series, decimals = 2) {
+  const option = shell(title, series.map((s) => s.label), "", yName, false);
   option.series = [
     {
       type: "bar",
-      barWidth: "45%",
-      data: [
-        { value: batteryValue, itemStyle: { color: CATEGORY_COLORS.A } },
-        { value: dieselValue, itemStyle: { color: CATEGORY_COLORS.B } },
-      ],
+      barWidth: "60%",
+      data: series.map((s) => ({ value: s.value, itemStyle: { color: s.color } })),
       label: { show: true, position: "top", color: TEXT_PRIMARY, formatter: (p) => fmtNumber(p.value, decimals) },
     },
   ];

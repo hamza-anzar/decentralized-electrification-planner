@@ -1,0 +1,18 @@
+section,metric,value,unit
+Load,Total connected load,2.159744,MW
+Load,Annual demand,3.8619884990261584,GWh/year
+Wind / Battery,Turbine count,2.0,units
+Wind / Battery,Installed turbine capacity,1000.0,kW
+Wind / Battery,Annual generation (Egen),3.866964105768166,GWh/year
+Wind / Battery,Battery capacity,98000.0,kWh
+Wind / Battery,Zero-yield hours,2251.0,h/year
+Cost,Capital cost (Capex),18315471.41,EUR
+Cost,Capital cost (Capex),21612256.2638,USD
+Cost,"Total Opex (30yr, present value basis)",17876418.567043595,EUR
+Cost,Total cost (Capex+Opex),36191889.9770436,EUR
+Cost,LCOE (generation-based),0.3119750531867095,EUR/kWh
+ROI,Tariff used,0.3119750531867095,EUR/kWh
+ROI,NPV,-10874915.37591656,EUR
+ROI,Lifetime ROI,56.729677678236825,%
+ROI,Simple payback,24.017031312801127,years
+ROI,Discounted payback,,years
